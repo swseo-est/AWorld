@@ -1,158 +1,64 @@
-# AworldServer
+# AWorld 분산 서버 (`aworlddistributed`)
 
-AworldServer is an execution environment for the Aworld framework that integrates MCP LLM models. It supports distributed deployment and dynamic scaling. 
+이 디렉토리는 AWorld 프레임워크를 확장 가능하고 분산된 컨테이너화된 애플리케이션으로 실행하는 데 필요한 구성 요소들을 포함합니다. 에이전트 서빙, 태스크 관리, 그리고 서비스로서의 도구 제공을 위한 백엔드 인프라를 제공합니다.
 
 ![img.png](img.png)
 
-The system features:
+## 1. 아키텍처 개요
 
-- Distributed Architecture: Supports multi-server deployment with load balancing
-- Dynamic Scaling: Ability to adjust server capacity based on demand
-- LLM Integration: Built-in MCP LLM model support
-- Asynchronous Processing: Uses asynchronous programming patterns for improved performance
-- Containerized Deployment: Docker containerization support for easy environment management
+AWorld 분산 서버는 마이크로서비스 아키텍처를 기반으로 구축되었습니다. Docker를 사용하여 배포하고 `docker-compose`를 통해 관리하도록 설계되었습니다.
 
+주요 구성 요소는 다음과 같습니다:
+-   **API 서버**: 에이전트 태스크 실행 요청을 받는 주 진입점 (FastAPI 사용 추정).
+-   **태스크 관리**: 사용 가능한 에이전트 워커들에게 태스크를 분배하는 시스템.
+-   **에이전트 워커**: 에이전트 로직을 실행하는 AWorld 프레임워크 인스턴스. `aworldspace/agents` 디렉토리에 정의되어 있습니다.
+-   **데이터베이스**: 에이전트 메모리, 태스크 상태, 사용자 데이터를 영구 저장하기 위한 PostgreSQL 데이터베이스.
+-   **MCP 도구 서버**: 각각 특정 도구(예: 웹 브라우징, 파일 시스템 접근, 코드 실행)를 제공하는 개별 마이크로서비스 모음. 에이전트는 MCP(Multi-agent Communication Protocol)를 통해 이 서버들과 통신합니다.
 
+## 2. 디렉토리 구조
 
-## 🚀 Quick Start
+| 디렉토리                | 설명                                                                                                                                                                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`aworldspace/`**      | 분산 서버의 핵심 애플리케이션 모듈. 웹 서버 로직, 데이터베이스 모델, API 라우트를 포함합니다.                                                                                                                                    |
+| `aworldspace/agents`    | 분산 환경에 맞게 조정된 에이전트 정의를 포함합니다. 이 에이전트들은 태스크 관리 시스템에 의해 로드되고 실행되도록 설계되었습니다.                                                                                                   |
+| `aworldspace/db`        | PostgreSQL 데이터베이스와 상호 작용하기 위한 SQLAlchemy 데이터베이스 모델(`models.py`) 및 연결 로직(`db.py`)을 정의합니다.                                                                                                         |
+| `aworldspace/routes`    | 주 서버에 의해 노출되는 API 엔드포인트 정의(예: 태스크 제출 및 확인)를 포함합니다.                                                                                                                                             |
+| **`client/`**           | 배포된 AWorld 서버와 프로그래밍 방식으로 상호 작용하기 위한 Python 클라이언트 코드(`aworld_client.py`)를 제공합니다. 이를 통해 사용자는 다른 애플리케이션에서 태스크를 제출하고 결과를 검색할 수 있습니다.                        |
+| **`mcp_servers/`**      | 수많은 독립형 Python 서버를 포함하는 중요한 디렉토리. 각 서버는 특정 도구(예: `browser_server.py`, `search_server.py`, `e2b_code_server.py`)를 래핑하고 에이전트가 사용할 수 있도록 네트워크를 통해 노출합니다. |
+| **`main.py`**           | AWorld 서버 애플리케이션을 시작하기 위한 주 진입점입니다.                                                                                                                                                                     |
+| **`Dockerfile`**        | 주 AWorld 서버 Docker 이미지를 빌드하기 위한 레시피입니다.                                                                                                                                                                    |
+| **`docker-compose.yaml`** | 주 API 서버, 데이터베이스 및 모든 개별 MCP 도구 서버를 포함한 모든 서비스의 배포를 조정하기 위한 설정 파일입니다.                                                                                                            |
+| **`requirements.txt`**  | 분산 서버 및 모든 구성 요소에 필요한 Python 의존성 목록입니다.                                                                                                                                                                 |
+| **`start.sh`**          | 서비스를 시작하기 위한 편의 스크립트입니다.                                                                                                                                                                                   |
 
-1. Start services using Docker Compose:
+## 3. 빠른 시작
 
-```sh
-docker build  --build-arg MINIMUM_BUILD=true -f Dockerfile  --progress=plain -t aworldserver:main .
+1.  **Docker 이미지 빌드**:
+    ```sh
+    docker build --build-arg MINIMUM_BUILD=true -f Dockerfile --progress=plain -t aworldserver:main .
+    ```
 
-docker compose up -d
-```
-2. Configure the number of server instances:
+2.  **Docker Compose로 서비스 실행**:
+    ```sh
+    docker-compose up -d
+    ```
+    이 명령은 `docker-compose.yaml` 파일에 정의된 주 API 서버, 데이터베이스 및 기타 모든 서비스를 시작합니다.
 
-You can modify the `docker-compose.yaml` file to adjust the number of server instances. The default configuration includes 3 instances:
+3.  **서버와 상호 작용**:
+    Python 클라이언트, cURL 또는 호환되는 웹 UI(예: OpenWebUI)를 통해 실행 중인 서버와 상호 작용할 수 있습니다.
 
-3. Usage Methods:
-
-   a. OpenWebUI Integration:
-   - Configure external link in OpenWebUI settings
-   - Add AworldServer endpoints to the configuration
-   - Set up API key authentication
-
-   b. Python Client Usage:
-   ```python
-   # Initialize AworldTaskClient with server endpoints
-   AWORLD_TASK_CLIENT = AworldTaskClient(
-       know_hosts=["localhost:9299", "localhost:9399", "localhost:9499"]
-   )
-
-   async def _run_gaia_task(gaia_question_id: str) -> None:
-       """Run a single Gaia task with the given question ID.
-       
-       Args:
-           gaia_question_id: The ID of the question to process
-       """
-       global AWORLD_TASK_CLIENT
-       task_id = str(uuid.uuid4())
-       
-       # Submit task to Aworld server
-       await AWORLD_TASK_CLIENT.submit_task(
-           AworldTask(
-               task_id=task_id,
-               agent_id="gaia_agent",
-               agent_input=gaia_question_id,
-               session_id="session_id",
-               user_id="SYSTEM"
-           )
-       )
-       
-       # Get and print task result
-       task_result = await AWORLD_TASK_CLIENT.get_task_state(task_id=task_id)
-       print(task_result)
-
-   async def _batch_run_gaia_task(start_i: int, end_i: int) -> None:
-       """Run multiple Gaia tasks in parallel.
-       
-       Args:
-           start_i: Starting question ID
-           end_i: Ending question ID
-       """
-       tasks = [
-           _run_gaia_task(str(i))
-           for i in range(start_i, end_i + 1)
-       ]
-       await asyncio.gather(*tasks)
-
-   if __name__ == '__main__':
-       # Run batch processing for questions 1-5
-       asyncio.run(_batch_run_gaia_task(1, 5))
-   ```
-   c. user curl
-```shell
-curl http://localhost:9299/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer 0p3n-w3bu!" \
-  -d '{
-  "model": "gaia_agent",
-  "messages": [
-    {
-      "role": "user",
-      "content": [
+    **cURL 사용 예시:**
+    ```shell
+    curl http://localhost:9299/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -H "Authorization: Bearer your-api-key" \
+      -d '{
+      "model": "gaia_agent",
+      "messages": [
         {
-          "type": "text",
-          "text": "5"
+          "role": "user",
+          "content": "Your question or prompt here"
         }
       ]
-    }
-  ]
-}'
-
-```
-
-
-## 🔑 Key Features
-
-- **Distributed Task Processing System**
-  - Multi-server load balancing
-  - Round-robin task distribution
-  - Asynchronous task processing
-
-- **Docker Containerization**
-  - Multi-instance deployment
-  - Environment variable configuration
-  - Auto-restart mechanism
-
-- **API Services**
-  - FastAPI framework support
-  - RESTful API design
-  - Asynchronous request handling
-
-- **Development Tools**
-  - Debug mode support
-  - Batch task processing
-  - Task state tracking
-
-- **Security Features**
-  - API key authentication
-  - Session management
-  - User authentication
-
-
-
-## 📦 Installation and Setup
-
-Get started with aworldserver in a few easy steps:
-
-1. **Ensure Python 3.11 is installed.**
-
-2. **Install the required dependencies:**
-
-   ```sh
-   pip install -r requirements-minimux.txt
-   ```
-
-3. **Start the aworld server:**
-
-   ```sh
-   sh ./start.sh
-   ```
-### Custom debug
-
-please run `debug_run.py`
-
-## 
+    }'
+    ```

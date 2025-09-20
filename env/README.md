@@ -1,178 +1,29 @@
-<div align="center">
+# AWorld 에이전트 환경 (`env`)
 
-# VirtualPC MCP Server (Incubating)
+이 디렉토리는 AWorld 에이전트를 실행하기 위한 사전 패키지화된 컨테이너 환경을 제공합니다. 각 환경은 특정 작업 또는 벤치마크를 위해 설계되었으며, 사전 구성된 자체 도구 모음(MCP 서버)과 함께 제공됩니다.
 
-*A unified MCP tool runtime environment based on Debian with session-level environment isolation, environment state persistence, real-time UI visualization, distributed architecture, and extensibility*
+이러한 환경을 사용하면 재현성이 보장되고 개발자가 복잡한 툴체인을 설정하는 수고를 덜 수 있습니다.
 
-[![License: MIT][license-image]][license-url]
+## 사용 가능한 환경
 
-</div>
+두 가지 주요 환경을 사용할 수 있습니다:
 
-<div align="center">
+### 1. GAIA MCP 서버 (`gaia-mcp-server/`)
 
-[中文版](./README_zh.md) | [Quick Start](#quick-start) | [Development](#development) | [Contributing](#contributing)
+이 환경은 **GAIA(General AI Assistant) 벤치마크**에서 에이전트를 실행하도록 특별히 구성되었습니다. GAIA의 다양하고 복잡한 작업과 관련된 많은 도구 서버를 번들로 제공합니다.
 
-</div>
+-   **목적**: GAIA 벤치마크에서 에이전트의 표준화된 평가.
+-   **주요 도구**: `documents_server`, `googlesearch_server`, `terminal_server`, `browser_server` 등 다수.
+-   **설정**: `gaia-mcp-server` 디렉토리 내의 `Dockerfile` 및 스크립트를 사용하여 환경을 배포합니다.
 
----
+### 2. VirtualPC MCP 서버 (`virtualpc-mcp/`)
 
-## 1. Overview
+이것은 에이전트가 상호 작용할 가상 컴퓨터를 시뮬레이션하는 것을 목표로 하는 보다 범용적이고 복잡한 환경입니다. 자체 게이트웨이 및 컨테이너 관리 시스템을 포함합니다.
 
-VirtualPC MCP Server is a comprehensive MCP (Model Context Protocol) tool runtime environment designed to provide a unified, isolated, and scalable execution environment for AI agents. Built on Debian, it offers session-level environment isolation, persistent state management across multiple sessions, and real-time visualization capabilities.
+-   **목적**: 사용자가 개인용 컴퓨터를 조작하는 것과 유사한 복잡한 작업을 수행해야 하는 에이전트를 위한 풍부하고 상호 작용적인 환경을 제공합니다.
+-   **기능**: 세션 수준 격리, 상태 지속성 및 에이전트 작업을 시각화하기 위한 실시간 UI.
+-   **설정**: `virtualpc-mcp` 디렉토리 내에 있는 `docker-compose.yaml` 파일을 사용하여 이 환경을 배포합니다.
 
-### 1.1 Features
+## 사용법
 
-- **Session-Level Environment Isolation**: Each MCP session operates within its own isolated environment
-- **Multi-Session State Persistence**: Maintains environment state across multiple MCP sessions
-- **Real-Time UI Visualization**: Live monitoring and visualization of Agent MCP operations
-- **Distributed Architecture**: Supports both local Docker and Kubernetes cluster deployments
-- **Extensible Runtime**: Modular design enabling seamless integration of new MCP tool servers
-
-## 2. Quick Start
-
-This project supports both local Docker deployment (optimal for demos and debugging) and Kubernetes cluster deployment (recommended for production and RL training).
-
-### 2.1 Local Docker Deployment
-
-#### Prerequisites
-
-Ensure Docker and Docker Compose are properly installed and operational:
-
-```bash
-# Verify Docker installation
-docker --version
-docker compose --version
-
-# Verify Docker daemon is running
-docker ps
-docker compose ps
-```
-
-**Step 1: Configure Environment and Prepare Gaia Dataset**
-
-1. Copy the environment template and configure your settings:
-
-```bash
-cp ./gaia-mcp-server/mcp_servers/.env_template ./gaia-mcp-server/mcp_servers/.env
-```
-
-Edit `./gaia-mcp-server/mcp_servers/.env` with your specific configuration values.
-
-2. Download the [gaia_dataset](https://huggingface.co/datasets/gaia-benchmark/GAIA) from Hugging Face and place it in `./gaia-mcp-server/docker/gaia_dataset`
-
-**Step 2: Launch VirtualPC MCP Server**
-
-```bash
-sh run-docker.sh
-```
-
-Monitor the terminal output for any errors during startup.
-
-**Step 3: Connect to VirtualPC MCP Server**
-
-Use the following configuration to connect to the VirtualPC MCP Server:
-
-```json
-{
-    "virtualpc-mcp-server": {
-        "type": "streamable-http",
-        "url": "http://localhost:8000/mcp",
-        "headers": {
-            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHAiOiJsb2NhbF9kZWJ1ZyIsInZlcnNpb24iOjEsInRpbWUiOjE3NTYzOTUzNzIuMTg0MDc0NH0.SALKn1dxEzsdX82-e3jAJANAo_kE4NO4192Epw5rYmQ",
-            "MCP_SERVERS": "readweb-server,browser-server"
-        },
-        "timeout": 6000,
-        "sse_read_timeout": 6000,
-        "client_session_timeout_seconds": 6000
-    }
-}
-```
-
-**Note**: The Bearer token above is for local testing only. The `MCP_SERVERS` header specifies the MCP server scope for your current connection, which should be a subset of server names defined in `gaia-mcp-server/mcp_servers/mcp_config.py`.
-
-### 2.2 Kubernetes Cluster Deployment
-
-For production deployments and RL training scenarios, Kubernetes cluster deployment is recommended. Detailed instructions will be provided in future updates.
-
-## 3. Development
-
-### 3.1 Adding Custom MCP Tools to VirtualPC MCP Server
-
-**Step 1: Develop MCP Tool (Optional)**
-
-If you need to develop a custom MCP Tool and register it with VirtualPC MCP Server, create your MCP Tool project directory under `gaia-mcp-server/mcp_servers` and implement the MCP Tool code. Refer to the [hello_world](./gaia-mcp-server/mcp_servers/hello_world/) directory for the project structure.
-
-Project specifications:
-
-1. Use `pyproject.toml` to manage project dependencies for Docker image building
-
-**Step 2: Register MCP Tool**
-
-Register your developed MCP Tool or third-party MCP Tool with VirtualPC MCP Server.
-
-Edit the [MCP Tool registration file](./gaia-mcp-server/mcp_servers/mcp_config.py):
-
-```python
-"STDIO_SERVER_DEMO": {
-    "type": "stdio",
-    "command": "python",
-    "args": ["-m", "hello_world.main"],
-    "cwd": "hello_world",
-},
-"{SSE/STREAMABLE-HTTP_SERVER_NAME}": {
-    "type": "sse/streamable-http",
-    "url": "{URL for sse/streamable-http mcp server}",
-    "headers": {
-        "Authorization": f"Bearer {token}"
-    }
-},
-```
-
-**Step 3: Update MCP Tool Schema**
-
-> **Important**: VirtualPC MCP Server utilizes pre-generated tool schema data for the `list_tools()` function, therefore you must update [mcp_tool_schema.json](./gaia-mcp-server/mcp_servers/mcp_tool_schema.json) after modifying the MCP server configuration.
-
-A Python script [build_mcp_tool_schema.py](./gaia-mcp-server/mcp_servers/build_mcp_tool_schema.py) is provided to update `mcp_tool_schema.json`. Before executing this script, ensure the MCP server [.env](./gaia-mcp-server/mcp_servers/.env) file is correctly configured.
-
-```bash
-cd ./gaia-mcp-server/mcp_servers/
-pip install mcp
-python build_mcp_tool_schema.py
-```
-
-**Step 4: Build Docker Image and Deploy Service**
-
-After completing the above steps, build the Docker image and deploy the service.
-
-## 4. Contributing
-
-We welcome contributions from the community! Please refer to our contributing guidelines for:
-
-- Code style and standards
-- Pull request process
-- Issue reporting
-- Development setup instructions
-
-## 5. References
-
-### Acknowledgments
-
-- **Magentic-UI Project**: We have incorporated Docker Browser source code from the [magentic-ui](https://github.com/microsoft/magentic-ui) project. Special thanks to the magentic-ui project team for their excellent work.
-
-### Related Projects
-
-- [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)
-- [Magentic-UI](https://github.com/microsoft/magentic-ui)
-- [Debian](https://www.debian.org/)
-
----
-
-<div align="center">
-
-**VirtualPC MCP Server** - Empowering AI agents with robust, scalable runtime environments
-
-[license-image]: https://img.shields.io/badge/License-MIT-yellow.svg
-[license-url]: https://opensource.org/licenses/MIT
-
-</div>
-
+환경을 사용하려면 해당 하위 디렉토리로 이동하여 `Dockerfile` 또는 `docker-compose.yaml`의 지침에 따라 서비스를 빌드하고 실행하십시오. 실행되면 환경의 도구 서버가 네트워크에서 사용 가능하게 되어 에이전트가 MCP(Multi-agent Communication Protocol)를 통해 연결할 수 있습니다.
